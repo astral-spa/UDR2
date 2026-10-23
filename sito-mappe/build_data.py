@@ -14,6 +14,7 @@ Riempie sito-mappe/template.html con i dati e scrive due copie identiche del sit
 un unico file HTML autonomo: sito-mappe/index.html (pubblicato online) e index.html
 nella radice del repo (da aprire con un doppio clic).
 """
+import base64
 import csv
 import datetime
 import glob
@@ -350,20 +351,27 @@ def make_tab(svc, d, ts, st_by_trip, stops, stop_idx, route_lines):
     main = Counter(tuple(k) for k in ks).most_common()
     main = max(main, key=lambda kv: (kv[1], len(kv[0])))[0]
     rows = list(main)
+    extra = Counter()
+    trip_rows = []  # per ogni corsa, la riga del quadro di ciascuna sua fermata
     for k in ks:
-        prev = -1
+        prev, mine = -1, []
         for key in k:
-            if key in rows:
-                at = rows.index(key)
-                if at > prev:
-                    prev = at
-            else:
-                rows.insert(prev + 1, key)
-                prev += 1
+            # la stessa fermata più avanti nel quadro; se la corsa ci passa in un ordine diverso
+            # (varianti) si aggiunge una riga, così gli orari della corsa restano in ordine
+            at = next((i for i in range(prev + 1, len(rows)) if rows[i][0] == key[0] and
+                       (rows[i] == key or rows[i] not in k)), None)
+            if at is None:
+                extra[key[0]] += 1
+                row = key if key not in rows else (key[0], f"x{extra[key[0]]}")
+                rows.insert(prev + 1, row)
+                at = prev + 1
+            mine.append(rows[at])
+            prev = at
+        trip_rows.append(mine)
     pos = {key: i for i, key in enumerate(rows)}
 
     corse = []
-    for t, k in zip(ts, ks):
+    for t, k in zip(ts, trip_rows):
         o = [None] * len(rows)
         for key, r in zip(k, st_by_trip[t["trip_id"]]):
             o[pos[key]] = minutes(r["departure_time"] or r["arrival_time"])
@@ -432,7 +440,9 @@ def main():
     with open(os.path.join(HERE, "template.html"), encoding="utf-8") as f:
         html = f.read()
     blob = json.dumps(dati, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-    for old, new in (("/*DATI*/null", blob), ("/*TITOLO*/", TITOLO)):
+    with open(os.path.join(HERE, "logo.png"), "rb") as f:  # logo incluso nella pagina: online va solo index.html
+        logo = "data:image/png;base64," + base64.b64encode(f.read()).decode()
+    for old, new in (("/*DATI*/null", blob), ("/*TITOLO*/", TITOLO), ("/*LOGO*/", logo)):
         if old not in html:
             raise SystemExit(f"Segnaposto {old} non trovato in template.html")
         html = html.replace(old, new)
