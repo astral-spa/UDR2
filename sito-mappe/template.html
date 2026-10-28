@@ -1017,6 +1017,8 @@ function corseNelGiorno(l, v) {
   return n;
 }
 
+// comuni attraversati dalla linea, con il comune principale per primo
+function comuniOf(l) { return [l.area, ...(l.comuni || []).filter(c => c !== l.area)]; }
 function activeOn(svc, day) { return svcDates[svc] && svcDates[svc].has(day); }
 function tripsOn(l, day) {
   return l.tab.filter(t => activeOn(t.svc, day)).reduce((n, t) => n + t.corse.length, 0);
@@ -1160,8 +1162,8 @@ function renderList() {
     const hay = (l.n + " " + l.nome + " " + l.area + " " + (l.comuni || []).join(" ")).toLowerCase();
     const viaStop = stopHits.some(([s, i]) => stopUse[i].some(u => u.l === l));
     if (q && !hay.includes(q) && !viaStop) return;
-    if (!areas.has(l.area)) areas.set(l.area, []);
-    areas.get(l.area).push(l);
+    // la linea compare sotto ogni comune che attraversa, non solo sotto il comune principale
+    comuniOf(l).forEach(c => { if (!areas.has(c)) areas.set(c, []); areas.get(c).push(l); });
   });
   let html = "";
   if (stopHits.length) {
@@ -1171,9 +1173,9 @@ function renderList() {
       html += `<li><button data-stop="${i}"><span style="display:flex;gap:3px;flex-wrap:wrap">${ls.slice(0, 2).map(l => badge(l, "sm")).join("")}</span><span class="nm">${esc(s[1])}<span class="meta">${esc(s[2])}</span></span></button></li>`;
     });
   }
-  for (const [area, ls] of areas) {
+  for (const [area, ls] of [...areas].sort((a, b) => (a[0] || "~").localeCompare(b[0] || "~", "it"))) {
     html += `<li><h3>${esc(area || "Altre linee")}</h3></li>`;
-    ls.forEach(l => {
+    ls.sort((a, b) => a.n.localeCompare(b.n, "it", { numeric: true })).forEach(l => {
       const n = tripsOn(l, state.day);
       html += `<li><button data-line="${esc(l.id)}" aria-current="${state.line === l.id}"><span class="${n ? "" : "off"}">${badge(l)}</span>` +
         `<span class="nm">${esc(l.nome)}<span class="meta">${n ? n + " corse in questo giorno" : "non attiva in questo giorno"}</span></span></button></li>`;
@@ -1250,7 +1252,7 @@ function renderLine() {
 
   $("#pannello").innerHTML = `
     <div class="lhead">${badge(l)}<div><h2>${esc(l.nome)}</h2>
-      <div class="sub">${esc(l.area)}${l.km != null ? ` · percorso fino a ${l.km.toLocaleString("it-IT")} km` : ""} · <a href="#" id="tutte" style="color:var(--accent)">tutte le linee</a></div></div></div>
+      <div class="sub">${esc(comuniOf(l).join(", "))}${l.km != null ? ` · percorso fino a ${l.km.toLocaleString("it-IT")} km` : ""} · <a href="#" id="tutte" style="color:var(--accent)">tutte le linee</a></div></div></div>
     <div class="bar">
       <div class="seg" role="group" aria-label="Calendario">${svcs.map(s => {
         const on = activeOn(s, state.day);
@@ -1330,10 +1332,10 @@ function drawTrip(c) {
 
 /* ---------- filtri della mappa ---------- */
 const filt = { areas: new Set(JSON.parse(store.get("udr2-zone-off") || "[]")), onlyActive: store.get("udr2-soloAttive") === "1" };
-const AREE = [...new Set(LINEE.map(l => l.area))].sort((a, b) => a.localeCompare(b, "it"));
+const AREE = [...new Set(LINEE.flatMap(comuniOf))].sort((a, b) => a.localeCompare(b, "it"));
 function renderZone() {
   $("#zoneList").innerHTML = `<div class="row"><a data-all="1">tutte</a><a data-all="0">nessuna</a></div>` +
-    AREE.map(a => `<label><input type="checkbox" data-area="${esc(a)}" ${filt.areas.has(a) ? "" : "checked"}> ${esc(a || "Altre linee")}<small>${LINEE.filter(l => l.area === a).length}</small></label>`).join("");
+    AREE.map(a => `<label><input type="checkbox" data-area="${esc(a)}" ${filt.areas.has(a) ? "" : "checked"}> ${esc(a || "Altre linee")}<small>${LINEE.filter(l => comuniOf(l).includes(a)).length}</small></label>`).join("");
   const off = AREE.filter(a => filt.areas.has(a)).length;
   $("#zoneCnt").textContent = off ? `(${AREE.length - off}/${AREE.length})` : "";
 }
@@ -1597,7 +1599,7 @@ map.on("zoomend", () => { if (state.line) drawRoute(); });
 /* ---------- navigazione ---------- */
 function lineVisible(l) {
   if (state.line === l.id) return true;
-  if (filt.areas.has(l.area)) return false;
+  if (comuniOf(l).every(c => filt.areas.has(c))) return false;
   if (filt.onlyActive && !tripsOn(l, state.day)) return false;
   return true;
 }
