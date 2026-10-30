@@ -1626,7 +1626,7 @@ function go(id) {
   apply(id);
 }
 /* ---------- statistiche (GoatCounter) ---------- */
-// una visita per ogni apertura del sito e una per ogni linea aperta (percorso …/linea-14);
+// una sola voce per tutto il sito: una visita per ogni apertura, qualunque linea o giorno si apra;
 // il ricaricamento per il cambio di orario (?giorno=) non conta come nuova visita
 function contaVisita(path, title) {
   if (LOCALE) return;
@@ -1636,7 +1636,6 @@ function contaVisita(path, title) {
 
 function apply(id) {
   const nuova = id && byId[id] ? id : null;
-  if (nuova && nuova !== state.line && (state.started || !GIORNO_URL)) contaVisita(location.pathname.replace(/[^/]*$/, "") + "linea-" + nuova, "Linea " + nuova);
   if (state.line !== nuova) state.variant = null;
   state.line = nuova;
   state.trip = null;
@@ -1700,7 +1699,6 @@ $("#giorno").addEventListener("change", e => {
   setDay(state.day);
   if (!GIORNO_URL) contaVisita(location.pathname.replace(/[^/]*$/, ""), document.title);
   apply(location.hash.replace(/^#linea-/, ""));
-  state.started = true;
 })();
 </script>
 </body>
