@@ -867,6 +867,9 @@ details.zone .dd small { color: var(--muted); margin-left: auto; font-variant-nu
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
+<!-- statistiche delle visite: GoatCounter (senza cookie); le visite le conta la pagina, vedi contaVisita() -->
+<script>window.goatcounter = { no_onload: true };</script>
+<script data-goatcounter="https://andreaantonini.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
 <div class="app">
@@ -1622,8 +1625,18 @@ function go(id) {
   if (location.hash !== target && !(target === "#" && !location.hash)) { history.pushState(null, "", id ? target : location.pathname + location.search); }
   apply(id);
 }
+/* ---------- statistiche (GoatCounter) ---------- */
+// una visita per ogni apertura del sito e una per ogni linea aperta (percorso …/linea-14);
+// il ricaricamento per il cambio di orario (?giorno=) non conta come nuova visita
+function contaVisita(path, title) {
+  if (LOCALE) return;
+  const invia = () => window.goatcounter && goatcounter.count && goatcounter.count({ path, title });
+  if (document.readyState === "complete") invia(); else window.addEventListener("load", invia, { once: true });
+}
+
 function apply(id) {
   const nuova = id && byId[id] ? id : null;
+  if (nuova && nuova !== state.line && (state.started || !GIORNO_URL)) contaVisita(location.pathname.replace(/[^/]*$/, "") + "linea-" + nuova, "Linea " + nuova);
   if (state.line !== nuova) state.variant = null;
   state.line = nuova;
   state.trip = null;
@@ -1685,7 +1698,9 @@ $("#giorno").addEventListener("change", e => {
   state.day = g >= D.periodo.dal && g <= D.periodo.al ? g : D.periodo.dal;
   // se il giorno scelto non ha servizio (es. domenica prima dell'avvio), resta comunque selezionabile
   setDay(state.day);
+  if (!GIORNO_URL) contaVisita(location.pathname.replace(/[^/]*$/, ""), document.title);
   apply(location.hash.replace(/^#linea-/, ""));
+  state.started = true;
 })();
 </script>
 </body>
