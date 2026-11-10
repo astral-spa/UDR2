@@ -1876,7 +1876,8 @@ $("#giorno").addEventListener("change", e => {
   state.day = g >= D.periodo.dal && g <= D.periodo.al ? g : D.periodo.dal;
   // se il giorno scelto non ha servizio (es. domenica prima dell'avvio), resta comunque selezionabile
   setDay(state.day);
-  if (!GIORNO_URL) contaVisita(location.pathname.replace(/[^/]*$/, ""), document.title);
+  // percorso fisso: con il dominio proprio il sito è alla radice, le visite restano su "/UDR2/" come prima
+  if (!GIORNO_URL) contaVisita("/UDR2/", document.title);
   apply(location.hash.replace(/^#linea-/, ""));
 })();
 </script>
